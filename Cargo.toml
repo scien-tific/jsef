@@ -1,0 +1,10 @@
+[package]
+name = "jsef"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT-0"
+
+[dependencies.crash]
+git = "https://github.com/scien-tific/crash.git"
+tag = "v0.2.0"
