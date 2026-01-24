@@ -226,8 +226,9 @@ impl Parser<'_> {
 					// unwrap should be safe, val was just replaced with a JsefValue::Dict
 					dict = val.as_dict_mut().unwrap();
 				},
-			};
+			}
 			
+			self.skip_whitespace();
 			key = self.parse_ident()?;
 			self.skip_whitespace();
 		}

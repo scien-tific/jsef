@@ -21,6 +21,9 @@ pub struct ComposeOpts<'a> {
 	/// Whether root elements should be enclosed in appropriate brackets.
 	/// Has no effect on [`compose_value`](crate::compose_value).
 	pub root_brackets: bool,
+	
+	/// Whether single-item dicts should be folded with the path notation.
+	pub fold_dicts: bool,
 }
 
 impl ComposeOpts<'static> {
@@ -31,11 +34,13 @@ impl ComposeOpts<'static> {
 	/// - `force_quotes`: `false`
 	/// - `dense`: `false`
 	/// - `root_brackets`: `false`
+	/// - `fold_dicts`: `true`
 	pub const PRETTY: Self = Self {
 		indent: Some("\t"),
 		force_quotes: false,
 		dense: false,
 		root_brackets: false,
+		fold_dicts: true,
 	};
 	
 	/// The default options for compact outputs not necessarily intended for reading.
@@ -45,11 +50,13 @@ impl ComposeOpts<'static> {
 	/// - `force_quotes`: `false`
 	/// - `dense`: `true`
 	/// - `root_brackets`: `false`
+	/// - `fold_dicts`: `true`
 	pub const COMPACT: Self = Self {
 		indent: None,
 		force_quotes: false,
 		dense: true,
 		root_brackets: false,
+		fold_dicts: true,
 	};
 	
 	/// The default options for simplified outputs that are easier to parse.
@@ -59,11 +66,13 @@ impl ComposeOpts<'static> {
 	/// - `force_quotes`: `true`
 	/// - `dense`: `true`
 	/// - `root_brackets`: `true`
+	/// - `fold_dicts`: `false`
 	pub const SIMPLE: Self = Self {
 		indent: None,
 		force_quotes: true,
 		dense: true,
 		root_brackets: true,
+		fold_dicts: false,
 	};
 }
 
@@ -86,6 +95,11 @@ impl<'a> ComposeOpts<'a> {
 	
 	pub fn root_brackets(mut self, value: bool) -> Self {
 		self.root_brackets = value;
+		self
+	}
+	
+	pub fn fold_dicts(mut self, value: bool) -> Self {
+		self.fold_dicts = value;
 		self
 	}
 }
@@ -188,8 +202,20 @@ impl Composer<'_> {
 		}
 	}
 	
-	fn compose_pair(&mut self, key: &str, value: &JsefValue) -> JsefResult {
+	fn compose_pair(&mut self, key: &str, mut value: &JsefValue) -> JsefResult {
 		self.compose_string(key);
+		
+		if self.opts.fold_dicts {
+			while let Some(dict) = value.as_dict() {
+				if dict.len() != 1 {break;}
+				
+				// dict.len() == 1 here, so unwrap should be ok
+				let (key, val) = dict.iter().next().unwrap();
+				self.target.push('.');
+				self.target.push_str(key);
+				value = val;
+			}
+		}
 		
 		if self.opts.dense {
 			self.target.push('=');

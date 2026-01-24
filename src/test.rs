@@ -22,7 +22,7 @@ dict = {
 # or the same with path notation...
 dict.a = x
 dict.b = y
-dict.a.oops = z # dict.a is now replaced with {oops = z}
+dict.a . oops = z # dict.a is now replaced with {oops = z}
 "##;
 
 

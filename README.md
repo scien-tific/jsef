@@ -28,6 +28,9 @@ dict.b = y
 dict.a.oops = z # dict.a is now replaced with {oops = z}
 ```
 
-## Notes
+## TODO
 
-Currently, none of the `compose_*` functions use the path notation.
+- [x] `ComposeOpts::fold_dicts`
+- [ ] `ComposeOpts::prelude`
+- [ ] Better test coverage
+- [ ] `io::Read` and `io::Write` based parsing and composing
