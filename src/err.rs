@@ -4,7 +4,7 @@ use std::{fmt, error};
 pub type JsefResult<T = ()> = Result<T, JsefErr>;
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsefErr {
 	pub err: JsefErrType,
 	pub pos: usize,
@@ -26,7 +26,7 @@ impl error::Error for JsefErr {}
 
 
 #[non_exhaustive]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JsefErrType {
 	BadChar(char),
 	BadEof,

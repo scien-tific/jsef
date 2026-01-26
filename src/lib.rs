@@ -163,7 +163,7 @@ where S: AsRef<str> {
 
 /// Parses a [`JsefList`] from the input string.
 /// 
-/// Allows for the root square brackets to be omitted.
+/// *Requires* root square brackets to be omitted.
 pub fn parse_list<S>(string: S) -> JsefResult<JsefList>
 where S: AsRef<str> {
 	Parser::new(string.as_ref()).parse_list_root()
@@ -171,7 +171,7 @@ where S: AsRef<str> {
 
 /// Parses a [`JsefDict`] from the input string.
 /// 
-/// Allows for the root curly brackets to be omitted.
+/// *Requires* root curly brackets to be omitted.
 pub fn parse_dict<S>(string: S) -> JsefResult<JsefDict>
 where S: AsRef<str> {
 	Parser::new(string.as_ref()).parse_dict_root()
@@ -180,17 +180,21 @@ where S: AsRef<str> {
 
 /// Composes the input [`JsefValue`] into a string formatted using [`opts`](ComposeOpts).
 /// 
-/// Always includes root brackets, ignoring `opts.root_brackets`.
+/// Includes root brackets and pairs with [`parse_value`].
 pub fn compose_value(value: &JsefValue, opts: &ComposeOpts) -> JsefResult<String> {
 	Composer::new(opts).compose_value_root(value)
 }
 
 /// Composes the input [`JsefList`] into a string formatted using [`opts`](ComposeOpts).
+/// 
+/// Omits root brackets and pairs with [`parse_list`].
 pub fn compose_list(list: &JsefList, opts: &ComposeOpts) -> JsefResult<String> {
 	Composer::new(opts).compose_list_root(list)
 }
 
 /// Composes the input [`JsefDict`] into a string formatted using [`opts`](ComposeOpts).
+/// 
+/// Omits root brackets and pairs with [`parse_dict`].
 pub fn compose_dict(dict: &JsefDict, opts: &ComposeOpts) -> JsefResult<String> {
 	Composer::new(opts).compose_dict_root(dict)
 }

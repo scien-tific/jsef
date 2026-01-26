@@ -244,23 +244,19 @@ impl Parser<'_> {
 	
 	fn parse_many<F>(&mut self, root: bool, open: char, close: char, mut func: F) -> JsefResult
 	where F: FnMut(&mut Self) -> JsefResult {
-		self.push_depth()?;
-		
-		let brackets = if root {
-			self.try_eat(open)
-		} else {
+		if !root {
+			self.push_depth()?;
 			self.eat(open)?;
-			true
-		};
+		}
 		
 		self.skip_whitespace();
 		
-		while if brackets {!self.try_eat(close)} else {!self.at_eof()} {
+		while if root {!self.at_eof()} else {!self.try_eat(close)} {
 			func(self)?;
 			self.skip_whitespace();
 		}
 		
-		self.pop_depth();
+		if !root {self.pop_depth();}
 		
 		Ok(())
 	}

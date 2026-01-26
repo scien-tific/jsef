@@ -18,10 +18,6 @@ pub struct ComposeOpts<'a> {
 	/// Whether extra spaces should be omitted when unnecessary.
 	pub dense: bool,
 	
-	/// Whether root elements should be enclosed in appropriate brackets.
-	/// Has no effect on [`compose_value`](crate::compose_value).
-	pub root_brackets: bool,
-	
 	/// Whether single-item dicts should be folded with the path notation.
 	pub fold_dicts: bool,
 	
@@ -36,14 +32,12 @@ impl ComposeOpts<'static> {
 	/// - `indent`: `Some("\t")`
 	/// - `force_quotes`: `false`
 	/// - `dense`: `false`
-	/// - `root_brackets`: `false`
 	/// - `fold_dicts`: `true`
 	/// - `prelude`: `None`
 	pub const PRETTY: Self = Self {
 		indent: Some("\t"),
 		force_quotes: false,
 		dense: false,
-		root_brackets: false,
 		fold_dicts: true,
 		prelude: None,
 	};
@@ -54,14 +48,12 @@ impl ComposeOpts<'static> {
 	/// - `indent`: `None`
 	/// - `force_quotes`: `false`
 	/// - `dense`: `true`
-	/// - `root_brackets`: `false`
 	/// - `fold_dicts`: `true`
 	/// - `prelude`: `None`
 	pub const COMPACT: Self = Self {
 		indent: None,
 		force_quotes: false,
 		dense: true,
-		root_brackets: false,
 		fold_dicts: true,
 		prelude: None,
 	};
@@ -72,14 +64,12 @@ impl ComposeOpts<'static> {
 	/// - `indent`: `None`
 	/// - `force_quotes`: `true`
 	/// - `dense`: `true`
-	/// - `root_brackets`: `true`
 	/// - `fold_dicts`: `false`
 	/// - `prelude`: `None`
 	pub const SIMPLE: Self = Self {
 		indent: None,
 		force_quotes: true,
 		dense: true,
-		root_brackets: true,
 		fold_dicts: false,
 		prelude: None,
 	};
@@ -99,11 +89,6 @@ impl<'a> ComposeOpts<'a> {
 	
 	pub fn dense(mut self, value: bool) -> Self {
 		self.dense = value;
-		self
-	}
-	
-	pub fn root_brackets(mut self, value: bool) -> Self {
-		self.root_brackets = value;
 		self
 	}
 	
@@ -139,17 +124,15 @@ impl<'o> Composer<'o> {
 	}
 	
 	pub(crate) fn compose_list_root(mut self, list: &JsefList) -> JsefResult<String> {
-		let brackets = self.opts.root_brackets;
 		self.compose_prelude();
-		self.compose_list(list, brackets)?;
+		self.compose_list(list, true)?;
 		
 		Ok(self.target)
 	}
 	
 	pub(crate) fn compose_dict_root(mut self, dict: &JsefDict) -> JsefResult<String> {
-		let brackets = self.opts.root_brackets;
 		self.compose_prelude();
-		self.compose_dict(dict, brackets)?;
+		self.compose_dict(dict, true)?;
 		
 		Ok(self.target)
 	}
@@ -259,7 +242,7 @@ impl Composer<'_> {
 	
 	fn compose_many<I, F>(
 		&mut self,
-		brackets: bool,
+		root: bool,
 		open: char, close: char,
 		mut iter: I, mut func: F
 	) -> JsefResult
@@ -268,15 +251,15 @@ impl Composer<'_> {
 		F: FnMut(&mut Self, I::Item) -> JsefResult,
 	{
 		let mut empty = true;
-		self.push_depth()?;
 		
-		if brackets {
+		if !root {
+			self.push_depth()?;
 			self.target.push(open);
 		}
 		
 		if let Some(it) = iter.next() {
 			empty = false;
-			self.separator(false);
+			if !root {self.separator(false);}
 			func(self, it)?;
 		}
 		
@@ -285,12 +268,11 @@ impl Composer<'_> {
 			func(self, it)?;
 		}
 		
-		if brackets {
+		if !root {
+			self.pop_depth();
 			if !empty {self.separator(false);}
 			self.target.push(close);
 		}
-		
-		self.pop_depth();
 		
 		Ok(())
 	}
@@ -298,19 +280,19 @@ impl Composer<'_> {
 	fn compose_value(&mut self, value: &JsefValue) -> JsefResult {
 		match value {
 			JsefValue::String(string) => Ok(self.compose_string(string)),
-			JsefValue::List(list) => self.compose_list(list, true),
-			JsefValue::Dict(dict) => self.compose_dict(dict, true),
+			JsefValue::List(list) => self.compose_list(list, false),
+			JsefValue::Dict(dict) => self.compose_dict(dict, false),
 		}
 	}
 	
-	fn compose_list(&mut self, list: &JsefList, brackets: bool) -> JsefResult {
-		self.compose_many(brackets, '[', ']', list.iter(),
+	fn compose_list(&mut self, list: &JsefList, root: bool) -> JsefResult {
+		self.compose_many(root, '[', ']', list.iter(),
 			|this, val| this.compose_value(val)
 		)
 	}
 	
-	fn compose_dict(&mut self, dict: &JsefDict, brackets: bool) -> JsefResult {
-		self.compose_many(brackets, '{', '}', dict.iter(),
+	fn compose_dict(&mut self, dict: &JsefDict, root: bool) -> JsefResult {
+		self.compose_many(root, '{', '}', dict.iter(),
 			|this, (key, val)| this.compose_pair(key, val)
 		)
 	}
