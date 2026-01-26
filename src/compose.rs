@@ -24,6 +24,9 @@ pub struct ComposeOpts<'a> {
 	
 	/// Whether single-item dicts should be folded with the path notation.
 	pub fold_dicts: bool,
+	
+	/// A message that is written at the start of the composed string using line comments.
+	pub prelude: Option<&'a str>,
 }
 
 impl ComposeOpts<'static> {
@@ -35,12 +38,14 @@ impl ComposeOpts<'static> {
 	/// - `dense`: `false`
 	/// - `root_brackets`: `false`
 	/// - `fold_dicts`: `true`
+	/// - `prelude`: `None`
 	pub const PRETTY: Self = Self {
 		indent: Some("\t"),
 		force_quotes: false,
 		dense: false,
 		root_brackets: false,
 		fold_dicts: true,
+		prelude: None,
 	};
 	
 	/// The default options for compact outputs not necessarily intended for reading.
@@ -51,12 +56,14 @@ impl ComposeOpts<'static> {
 	/// - `dense`: `true`
 	/// - `root_brackets`: `false`
 	/// - `fold_dicts`: `true`
+	/// - `prelude`: `None`
 	pub const COMPACT: Self = Self {
 		indent: None,
 		force_quotes: false,
 		dense: true,
 		root_brackets: false,
 		fold_dicts: true,
+		prelude: None,
 	};
 	
 	/// The default options for simplified outputs that are easier to parse.
@@ -67,12 +74,14 @@ impl ComposeOpts<'static> {
 	/// - `dense`: `true`
 	/// - `root_brackets`: `true`
 	/// - `fold_dicts`: `false`
+	/// - `prelude`: `None`
 	pub const SIMPLE: Self = Self {
 		indent: None,
 		force_quotes: true,
 		dense: true,
 		root_brackets: true,
 		fold_dicts: false,
+		prelude: None,
 	};
 }
 
@@ -102,6 +111,12 @@ impl<'a> ComposeOpts<'a> {
 		self.fold_dicts = value;
 		self
 	}
+	
+	pub fn prelude<T>(mut self, value: T) -> Self
+	where T: Into<Option<&'a str>> {
+		self.prelude = value.into();
+		self
+	}
 }
 
 
@@ -118,12 +133,14 @@ impl<'o> Composer<'o> {
 	}
 	
 	pub(crate) fn compose_value_root(mut self, value: &JsefValue) -> JsefResult<String> {
+		self.compose_prelude();
 		self.compose_value(value)?;
 		Ok(self.target)
 	}
 	
 	pub(crate) fn compose_list_root(mut self, list: &JsefList) -> JsefResult<String> {
 		let brackets = self.opts.root_brackets;
+		self.compose_prelude();
 		self.compose_list(list, brackets)?;
 		
 		Ok(self.target)
@@ -131,6 +148,7 @@ impl<'o> Composer<'o> {
 	
 	pub(crate) fn compose_dict_root(mut self, dict: &JsefDict) -> JsefResult<String> {
 		let brackets = self.opts.root_brackets;
+		self.compose_prelude();
 		self.compose_dict(dict, brackets)?;
 		
 		Ok(self.target)
@@ -158,8 +176,8 @@ impl Composer<'_> {
 	
 	fn separator(&mut self, space: bool) {
 		if let Some(indent) = self.opts.indent {
-			let len = indent.len() * self.depth;
-			self.target.reserve(len + 1);
+			let len = indent.len() * self.depth + 1;
+			self.target.reserve(len);
 			self.target.push('\n');
 			
 			for _ in 0..self.depth {
@@ -167,6 +185,18 @@ impl Composer<'_> {
 			}
 		} else if space || !self.opts.dense {
 			self.target.push(' ');
+		}
+	}
+	
+	fn compose_prelude(&mut self) {
+		if let Some(msg) = self.opts.prelude {
+			for line in msg.lines() {
+				let len = line.len() + 3;
+				self.target.reserve(len);
+				self.target.push_str("# ");
+				self.target.push_str(line);
+				self.target.push('\n');
+			}
 		}
 	}
 	
