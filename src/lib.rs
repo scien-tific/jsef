@@ -1,12 +1,14 @@
 #![doc = include_str!("../README.md")]
 
 
+mod test;
 mod err;
+mod value;
 mod parse;
 mod compose;
-mod test;
 
 pub use err::*;
+pub use value::*;
 pub use compose::ComposeOpts;
 
 use crash::CrashMap;
@@ -17,140 +19,12 @@ use compose::Composer;
 /// Maximum nesting level for parsing and composing.
 pub const DEPTH_LIMIT: usize = 256;
 
-// Might be useful to eventually change these to wrapper structs
 
 /// A list of [`JsefValue`]s.
 pub type JsefList = Vec<JsefValue>;
 
 /// A string-keyed map of [`JsefValue`]s.
 pub type JsefDict = CrashMap<String, JsefValue>;
-
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum JsefValue {
-	String(String),
-	List(JsefList),
-	Dict(JsefDict),
-}
-
-macro_rules! get {
-	( $self:expr, $var:pat => $out:expr ) => {
-		match $self {
-			$var => Some($out),
-			_ => None,
-		}
-	};
-}
-
-macro_rules! take {
-	( $self:expr, $var:pat => $out:expr ) => {
-		match $self {
-			$var => Ok($out),
-			other => Err(other),
-		}
-	};
-}
-
-impl JsefValue {
-	pub fn new_string() -> Self {
-		Self::String(String::new())
-	}
-	
-	pub fn new_list() -> Self {
-		Self::List(JsefList::new())
-	}
-	
-	pub fn new_dict() -> Self {
-		Self::Dict(JsefDict::default())
-	}
-	
-	
-	pub fn is_string(&self) -> bool {
-		matches!(self, Self::String(_))
-	}
-	
-	pub fn as_string(&self) -> Option<&String> {
-		get!(self, Self::String(s) => s)
-	}
-	
-	pub fn as_string_mut(&mut self) -> Option<&mut String> {
-		get!(self, Self::String(s) => s)
-	}
-	
-	pub fn take_string(self) -> Result<String, Self> {
-		take!(self, Self::String(s) => s)
-	}
-	
-	
-	pub fn is_list(&self) -> bool {
-		matches!(self, Self::List(_))
-	}
-	
-	pub fn as_list(&self) -> Option<&JsefList> {
-		get!(self, Self::List(l) => l)
-	}
-	
-	pub fn as_list_mut(&mut self) -> Option<&mut JsefList> {
-		get!(self, Self::List(l) => l)
-	}
-	
-	pub fn take_list(self) -> Result<JsefList, Self> {
-		take!(self, Self::List(l) => l)
-	}
-	
-	
-	pub fn is_dict(&self) -> bool {
-		matches!(self, Self::Dict(_))
-	}
-	
-	pub fn as_dict(&self) -> Option<&JsefDict> {
-		get!(self, Self::Dict(d) => d)
-	}
-	
-	pub fn as_dict_mut(&mut self) -> Option<&mut JsefDict> {
-		get!(self, Self::Dict(d) => d)
-	}
-	
-	pub fn take_dict(self) -> Result<JsefDict, Self> {
-		take!(self, Self::Dict(d) => d)
-	}
-}
-
-impl From<String> for JsefValue {
-	fn from(string: String) -> Self {
-		Self::String(string)
-	}
-}
-
-impl From<&str> for JsefValue {
-	fn from(string: &str) -> Self {
-		Self::String(string.to_owned())
-	}
-}
-
-impl From<JsefList> for JsefValue {
-	fn from(list: JsefList) -> Self {
-		Self::List(list)
-	}
-}
-
-impl From<&[JsefValue]> for JsefValue {
-	fn from(slice: &[JsefValue]) -> Self {
-		Self::List(JsefList::from(slice))
-	}
-}
-
-impl<const N: usize> From<[JsefValue; N]> for JsefValue {
-	fn from(arr: [JsefValue; N]) -> Self {
-		Self::List(JsefList::from(arr))
-	}
-}
-
-impl From<JsefDict> for JsefValue {
-	fn from(dict: JsefDict) -> Self {
-		Self::Dict(dict)
-	}
-}
 
 
 /// Parses any [`JsefValue`] from the input string.

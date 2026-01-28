@@ -48,7 +48,7 @@ fn parse_values() {
 	const PLAIN: &str = "value";
 	const QUOTED: &str = " \"value\" ";
 	
-	let value = JsefValue::from("value");
+	let value = JsefValue::string_from("value");
 	
 	let parsed = parse_value(PLAIN).unwrap();
 	assert_eq!(parsed, value);
@@ -63,9 +63,9 @@ fn dict_parse() {
 	const SOURCE: &str = "a=1 b=2 c=3";
 	
 	let mut root = JsefDict::default();
-	root.insert("a".to_owned(), JsefValue::from("1"));
-	root.insert("b".to_owned(), JsefValue::from("2"));
-	root.insert("c".to_owned(), JsefValue::from("3"));
+	root.insert("a".to_owned(), JsefValue::string_from("1"));
+	root.insert("b".to_owned(), JsefValue::string_from("2"));
+	root.insert("c".to_owned(), JsefValue::string_from("3"));
 	
 	let parsed = parse_dict(SOURCE).unwrap();
 	assert_eq!(parsed, root);
@@ -76,11 +76,11 @@ fn dict_parse() {
 fn list_parse() {
 	const SOURCE: &str = "[1] 2 3";
 	
-	let list = JsefList::from([JsefValue::from("1")]);
+	let list = JsefList::from([JsefValue::string_from("1")]);
 	let root = JsefList::from([
 		JsefValue::List(list),
-		JsefValue::from("2"),
-		JsefValue::from("3"),
+		JsefValue::string_from("2"),
+		JsefValue::string_from("3"),
 	]);
 	
 	let parsed = parse_list(SOURCE).unwrap();
@@ -96,7 +96,7 @@ fn path_parse() {
 	let mut a = JsefDict::default();
 	let mut b = JsefDict::default();
 	
-	b.insert("c".to_owned(), JsefValue::from("value"));
+	b.insert("c".to_owned(), JsefValue::string_from("value"));
 	a.insert("b".to_owned(), JsefValue::Dict(b));
 	root.insert("a".to_owned(), JsefValue::Dict(a));
 	
@@ -130,21 +130,21 @@ fn stresstest() {
 	let mut dict = JsefDict::default();
 	let mut a = JsefDict::default();
 	
-	let list = JsefValue::from([
-		JsefValue::from("0"),
-		JsefValue::from("1"),
-		JsefValue::from("2"),
-		JsefValue::from("3"),
+	let list = JsefValue::list_from([
+		JsefValue::string_from("0"),
+		JsefValue::string_from("1"),
+		JsefValue::string_from("2"),
+		JsefValue::string_from("3"),
 	]);
 	
-	a.insert("oops".to_owned(), JsefValue::from("z"));
+	a.insert("oops".to_owned(), JsefValue::string_from("z"));
 	dict.insert("a".to_owned(), JsefValue::Dict(a));
-	dict.insert("b".to_owned(), JsefValue::from("y"));
+	dict.insert("b".to_owned(), JsefValue::string_from("y"));
 	
-	root.insert("key".to_owned(), JsefValue::from("value"));
+	root.insert("key".to_owned(), JsefValue::string_from("value"));
 	root.insert("list".to_owned(), list);
-	root.insert("0".to_owned(), JsefValue::from("1"));
-	root.insert("#".to_owned(), JsefValue::from("multiline\nvalue"));
+	root.insert("0".to_owned(), JsefValue::string_from("1"));
+	root.insert("#".to_owned(), JsefValue::string_from("multiline\nvalue"));
 	root.insert("dict".to_owned(), JsefValue::Dict(dict));
 	
 	let parsed = parse_dict(SOURCE).unwrap();
@@ -172,12 +172,12 @@ fn compose() {
 	let mut right = JsefDict::default();
 	let mut path = JsefDict::default();
 	
-	path.insert("to".to_owned(), JsefValue::from("a value"));
+	path.insert("to".to_owned(), JsefValue::string_from("a value"));
 	left.insert("path".to_owned(), JsefValue::Dict(path));
-	right.insert("a".to_owned(), JsefValue::from("0"));
-	right.insert("b".to_owned(), JsefValue::from("1"));
+	right.insert("a".to_owned(), JsefValue::string_from("0"));
+	right.insert("b".to_owned(), JsefValue::string_from("1"));
 	root.push(JsefValue::Dict(left));
-	root.push(JsefValue::from("other"));
+	root.push(JsefValue::string_from("other"));
 	root.push(JsefValue::Dict(right));
 	
 	let iter = OPTS.iter().zip(TARGETS.iter());

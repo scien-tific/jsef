@@ -33,4 +33,3 @@ dict.a.oops = z # dict.a is now replaced with {oops = z}
 - [x] `ComposeOpts::fold_dicts`
 - [x] `ComposeOpts::prelude`
 - [ ] `io::Read` and `io::Write` based parsing and composing
-- [ ] `JsefList` and `JsefDict` as wrapper structs
