@@ -28,16 +28,20 @@ impl error::Error for JsefErr {}
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JsefErrType {
-	BadChar(char),
-	BadEof,
+	Unexpected(Option<char>),
+	Mismatch(char, Option<char>),
+	NotEof(char),
 	MaxDepth,
 }
 
 impl fmt::Display for JsefErrType {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
-			Self::BadChar(c) => write!(f, "unexpected character '{c}'"),
-			Self::BadEof => write!(f, "unexpected EOF"),
+			Self::Unexpected(None) => write!(f, "unexpected EOF"),
+			Self::Unexpected(Some(c)) => write!(f, "unexpected '{c}'"),
+			Self::Mismatch(c, None) => write!(f, "expected '{c}', got EOF"),
+			Self::Mismatch(c, Some(e)) => write!(f, "expected '{c}', got '{e}'"),
+			Self::NotEof(c) => write!(f, "expected EOF, got '{c}'"),
 			Self::MaxDepth => write!(f, "maximum nesting depth exceeded"),
 		}
 	}

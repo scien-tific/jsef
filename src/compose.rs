@@ -12,7 +12,7 @@ pub struct ComposeOpts<'a> {
 	/// `None` means the entire JSeF will be composed on a single line.
 	pub indent: Option<&'a str>,
 	
-	/// Whether all keys and string values should be enclosed in double quotes regardless of their content.
+	/// Whether all keys and values should be enclosed in double quotes regardless of their content.
 	pub force_quotes: bool,
 	
 	/// Whether extra spaces should be omitted when unnecessary.

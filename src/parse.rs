@@ -52,17 +52,6 @@ impl Parser<'_> {
 		JsefErr::new(err, self.idx)
 	}
 	
-	fn err_bad_char(&self) -> JsefErr {
-		self.err(match self.peek() {
-			Some(c) => JsefErrType::BadChar(c),
-			None => JsefErrType::BadEof,
-		})
-	}
-	
-	fn at_eof(&self) -> bool {
-		self.idx >= self.source.len()
-	}
-	
 	fn peek(&self) -> Option<char> {
 		// uhh
 		self.peek
@@ -99,7 +88,7 @@ impl Parser<'_> {
 				Ok(c)
 			},
 			
-			None => Err(self.err(JsefErrType::BadEof)),
+			p => Err(self.err(JsefErrType::Unexpected(p))),
 		}
 	}
 	
@@ -118,11 +107,13 @@ impl Parser<'_> {
 	}
 	
 	fn eat(&mut self, c: char) -> JsefResult {
-		if self.peek() == Some(c) {
-			self.advance();
-			Ok(())
-		} else {
-			Err(self.err_bad_char())
+		match self.peek() {
+			Some(p) if p == c => {
+				self.advance();
+				Ok(())
+			},
+			
+			p => Err(self.err(JsefErrType::Mismatch(c, p))),
 		}
 	}
 	
@@ -137,7 +128,7 @@ impl Parser<'_> {
 	
 	fn assert_eof(&self) -> JsefResult {
 		match self.peek() {
-			Some(c) => Err(self.err(JsefErrType::BadChar(c))),
+			Some(c) => Err(self.err(JsefErrType::NotEof(c))),
 			None => Ok(()),
 		}
 	}
@@ -164,7 +155,7 @@ impl Parser<'_> {
 		if !slice.is_empty() {
 			Ok(slice.to_owned())
 		} else {
-			Err(self.err_bad_char())
+			Err(self.err(JsefErrType::Unexpected(self.peek())))
 		}
 	}
 	
@@ -242,8 +233,15 @@ impl Parser<'_> {
 		Ok(())
 	}
 	
-	fn parse_many<F>(&mut self, root: bool, open: char, close: char, mut func: F) -> JsefResult
-	where F: FnMut(&mut Self) -> JsefResult {
+	fn parse_many<C, F>(
+		&mut self,
+		root: bool, open: char, close: char,
+		mut cond: C, mut func: F,
+	) -> JsefResult
+	where 
+		C: FnMut(char) -> bool,
+		F: FnMut(&mut Self) -> JsefResult,
+	{
 		if !root {
 			self.push_depth()?;
 			self.eat(open)?;
@@ -251,12 +249,15 @@ impl Parser<'_> {
 		
 		self.skip_whitespace();
 		
-		while if root {!self.at_eof()} else {!self.try_eat(close)} {
+		while self.peek().is_some_and(&mut cond) {
 			func(self)?;
 			self.skip_whitespace();
 		}
 		
-		if !root {self.pop_depth();}
+		if !root {
+			self.pop_depth();
+			self.eat(close)?;
+		}
 		
 		Ok(())
 	}
@@ -268,17 +269,20 @@ impl Parser<'_> {
 			Some('"') => Ok(JsefValue::String(self.parse_string()?)),
 			Some(_) => Ok(JsefValue::String(self.parse_word()?)),
 			
-			None => Err(self.err(JsefErrType::BadEof)),
+			p => Err(self.err(JsefErrType::Unexpected(p))),
 		}
 	}
 	
 	fn parse_list(&mut self, root: bool) -> JsefResult<JsefList> {
 		let mut list = JsefList::new();
-		self.parse_many(root, '[', ']', |this| {
-			let value = this.parse_value()?;
-			list.push(value);
-			Ok(())
-		})?;
+		self.parse_many(root, '[', ']',
+			|c| c == '"' || c == '[' || c == '{' || is_word_char(c),
+			|this| {
+				let value = this.parse_value()?;
+				list.push(value);
+				Ok(())
+			},
+		)?;
 		
 		Ok(list)
 	}
@@ -286,7 +290,8 @@ impl Parser<'_> {
 	fn parse_dict(&mut self, root: bool) -> JsefResult<JsefDict> {
 		let mut dict = JsefDict::default();
 		self.parse_many(root, '{', '}',
-			|this| this.parse_pair(&mut dict)
+			|c| c == '"' || is_word_char(c),
+			|this| this.parse_pair(&mut dict),
 		)?;
 		
 		Ok(dict)

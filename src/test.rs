@@ -20,20 +20,21 @@ const OPTS: [ComposeOpts; 4] = [
 
 #[test]
 fn errors() {
+	use JsefErrType::*;
 	const SOURCES: [(&str, JsefErr); 13] = [
-		("{a=1 b=2 c=3",          JsefErr::new(JsefErrType::BadEof,       12)),
-		("a=1 b=2 c=3}",          JsefErr::new(JsefErrType::BadChar('='),  1)),
-		("[1 2 3",                JsefErr::new(JsefErrType::BadEof,        6)),
-		("1 2 3]",                JsefErr::new(JsefErrType::BadChar('2'),  2)),
-		("{a=1 \"b=2 c=3}",       JsefErr::new(JsefErrType::BadEof,       14)),
-		("{a=1 b\"=2 c=3}",       JsefErr::new(JsefErrType::BadChar('"'),  6)),
-		("{a=1 b= c=3}",          JsefErr::new(JsefErrType::BadChar('='),  9)),
-		("{a=1 =1 c=3}",          JsefErr::new(JsefErrType::BadChar('='),  5)),
-		("{a=1 b c=3}",           JsefErr::new(JsefErrType::BadChar('c'),  7)),
-		("[1 b=2 3]",             JsefErr::new(JsefErrType::BadChar('='),  4)),
-		("{a=1 new\nline=2 c=3}", JsefErr::new(JsefErrType::BadChar('l'),  9)),
-		("{a=1 b.=2 c=3}",        JsefErr::new(JsefErrType::BadChar('='),  7)),
-		("{a=1 .b=2 c=3}",        JsefErr::new(JsefErrType::BadChar('.'),  5)),
+		("{a=1 b=2 c=3",          JsefErr::new(Mismatch('}', None),     12)),
+		("a=1 b=2 c=3}",          JsefErr::new(NotEof('='),              1)),
+		("[1 2 3",                JsefErr::new(Mismatch(']', None),      6)),
+		("1 2 3]",                JsefErr::new(NotEof('2'),              2)),
+		("{a=1 \"b=2 c=3}",       JsefErr::new(Mismatch('"', None),     14)),
+		("{a=1 b\"=2 c=3}",       JsefErr::new(Mismatch('=', Some('"')), 6)),
+		("{a=1 b= c=3}",          JsefErr::new(Mismatch('}', Some('=')), 9)),
+		("{a=1 =1 c=3}",          JsefErr::new(Mismatch('}', Some('=')), 5)),
+		("{a=1 b c=3}",           JsefErr::new(Mismatch('=', Some('c')), 7)),
+		("[1 b=2 3]",             JsefErr::new(Mismatch(']', Some('=')), 4)),
+		("{a=1 new\nline=2 c=3}", JsefErr::new(Mismatch('=', Some('l')), 9)),
+		("{a=1 b.=2 c=3}",        JsefErr::new(Unexpected(Some('=')),    7)),
+		("{a=1 .b=2 c=3}",        JsefErr::new(Mismatch('}', Some('.')), 5)),
 	];
 	
 	for (string, err) in SOURCES {
