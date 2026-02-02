@@ -3,6 +3,7 @@
 
 mod test;
 mod err;
+mod counter;
 mod value;
 mod parse;
 mod compose;

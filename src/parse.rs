@@ -1,7 +1,8 @@
 use crate::{
 	JsefValue, JsefList, JsefDict,
-	JsefErr, JsefErrType, JsefResult,
+	JsefErrType, JsefResult,
 	DEPTH_LIMIT, is_word_char,
+	counter::LineColCounter,
 };
 
 
@@ -11,15 +12,19 @@ use crate::{
 pub(crate) struct Parser<'s> {
 	source: &'s str,
 	peek: Option<char>,
-	line: usize,
-	col: usize,
+	counter: LineColCounter,
 	depth: usize,
 }
 
 impl<'s> Parser<'s> {
 	pub(crate) fn new(source: &'s str) -> Self {
 		let peek = source.chars().next();
-		Self {depth: 0, line: 1, col: 1, source, peek}
+		
+		Self {
+			depth: 0,
+			counter: LineColCounter::new(),
+			source, peek,
+		}
 	}
 	
 	pub(crate) fn parse_value_root(mut self) -> JsefResult<JsefValue> {
@@ -49,22 +54,9 @@ impl<'s> Parser<'s> {
 }
 
 impl Parser<'_> {
-	fn err(&self, err: JsefErrType) -> JsefErr {
-		JsefErr::new(err, self.line, self.col)
-	}
-	
 	fn peek(&self) -> Option<char> {
 		// uhh
 		self.peek
-	}
-	
-	fn line_col(&mut self, c: char) {
-		if c == '\n' {
-			self.line += 1;
-			self.col = 1;
-		} else {
-			self.col += 1;
-		}
 	}
 	
 	fn advance(&mut self) {
@@ -73,7 +65,7 @@ impl Parser<'_> {
 		
 		self.source = &self.source[idx..];
 		self.peek = self.source.chars().next();
-		self.line_col(p);
+		self.counter.count(p);
 	}
 	
 	fn push_depth(&mut self) -> JsefResult {
@@ -82,7 +74,7 @@ impl Parser<'_> {
 		if self.depth < DEPTH_LIMIT {
 			Ok(())
 		} else {
-			Err(self.err(JsefErrType::MaxDepth))
+			Err(self.counter.err(JsefErrType::MaxDepth))
 		}
 	}
 	
@@ -97,7 +89,9 @@ impl Parser<'_> {
 				Ok(c)
 			},
 			
-			p => Err(self.err(JsefErrType::Unexpected(p))),
+			p => Err(self.counter.err(
+				JsefErrType::Unexpected(p)
+			)),
 		}
 	}
 	
@@ -110,7 +104,7 @@ impl Parser<'_> {
 				break;
 			}
 			
-			self.line_col(c);
+			self.counter.count(c);
 		}
 		
 		let slice = &self.source[..end];
@@ -127,7 +121,9 @@ impl Parser<'_> {
 				Ok(())
 			},
 			
-			p => Err(self.err(JsefErrType::Mismatch(c, p))),
+			p => Err(self.counter.err(
+				JsefErrType::Mismatch(c, p)
+			)),
 		}
 	}
 	
@@ -142,7 +138,10 @@ impl Parser<'_> {
 	
 	fn assert_eof(&self) -> JsefResult {
 		match self.peek() {
-			Some(c) => Err(self.err(JsefErrType::NotEof(c))),
+			Some(c) => Err(self.counter.err(
+				JsefErrType::NotEof(c)
+			)),
+			
 			None => Ok(()),
 		}
 	}
@@ -169,7 +168,9 @@ impl Parser<'_> {
 		if !slice.is_empty() {
 			Ok(slice.to_owned())
 		} else {
-			Err(self.err(JsefErrType::Unexpected(self.peek())))
+			Err(self.counter.err(
+				JsefErrType::Unexpected(self.peek())
+			))
 		}
 	}
 	
@@ -283,7 +284,9 @@ impl Parser<'_> {
 			Some('"') => Ok(JsefValue::String(self.parse_string()?)),
 			Some(_) => Ok(JsefValue::String(self.parse_word()?)),
 			
-			p => Err(self.err(JsefErrType::Unexpected(p))),
+			p => Err(self.counter.err(
+				JsefErrType::Unexpected(p)
+			)),
 		}
 	}
 	

@@ -16,7 +16,7 @@ impl LineColCounter {
 		JsefErr::new(err, self.line, self.col)
 	}
 	
-	pub(crate) const fn count_char(&mut self, c: char) {
+	pub(crate) fn count(&mut self, c: char) {
 		if c == '\n' {
 			self.line += 1;
 			self.col = 1;
@@ -25,9 +25,9 @@ impl LineColCounter {
 		}
 	}
 	
-	pub(crate) const fn count_str(&mut self, slice: &str) {
+	pub(crate) fn count_str(&mut self, slice: &str) {
 		for c in slice.chars() {
-			self.push_char(c);
+			self.count(c);
 		}
 	}
 }

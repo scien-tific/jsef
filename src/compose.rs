@@ -1,7 +1,8 @@
 use crate::{
 	JsefValue, JsefList, JsefDict,
-	JsefErr, JsefErrType, JsefResult,
+	JsefErrType, JsefResult,
 	DEPTH_LIMIT, is_word_char,
+	counter::LineColCounter,
 };
 
 
@@ -110,13 +111,17 @@ pub(crate) struct Composer<'o> {
 	opts: &'o ComposeOpts<'o>,
 	target: String,
 	depth: usize,
-	line: usize,
-	col: usize,
+	counter: LineColCounter,
 }
 
 impl<'o> Composer<'o> {
 	pub(crate) fn new(opts: &'o ComposeOpts) -> Self {
-		Self {target: String::new(), depth: 0, line: 1, col: 1, opts}
+		Self {
+			target: String::new(),
+			depth: 0,
+			counter: LineColCounter::new(),
+			opts,
+		}
 	}
 	
 	pub(crate) fn compose_value_root(mut self, value: &JsefValue) -> JsefResult<String> {
@@ -141,17 +146,13 @@ impl<'o> Composer<'o> {
 }
 
 impl Composer<'_> {
-	fn err(&self, err: JsefErrType) -> JsefErr {
-		JsefErr::new(err, self.line, self.col)
-	}
-	
 	fn push_depth(&mut self) -> JsefResult {
 		self.depth += 1;
 		
 		if self.depth < DEPTH_LIMIT {
 			Ok(())
 		} else {
-			Err(self.err(JsefErrType::MaxDepth))
+			Err(self.counter.err(JsefErrType::MaxDepth))
 		}
 	}
 	
@@ -160,26 +161,12 @@ impl Composer<'_> {
 	}
 	
 	fn write_char(&mut self, c: char) {
-		if c == '\n' {
-			self.line += 1;
-			self.col = 1;
-		} else {
-			self.col += 1;
-		}
-		
+		self.counter.count(c);
 		self.target.push(c);
 	}
 	
 	fn write(&mut self, slice: &str) {
-		for c in slice.chars() {
-			if c == '\n' {
-				self.line += 1;
-				self.col = 1;
-			} else {
-				self.col += 1;
-			}
-		}
-		
+		self.counter.count_str(slice);
 		self.target.push_str(slice);
 	}
 	
