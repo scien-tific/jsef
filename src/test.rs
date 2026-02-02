@@ -22,19 +22,19 @@ const OPTS: [ComposeOpts; 4] = [
 fn errors() {
 	use JsefErrType::*;
 	const SOURCES: [(&str, JsefErr); 13] = [
-		("{a=1 b=2 c=3",          JsefErr::new(Mismatch('}', None),     12)),
-		("a=1 b=2 c=3}",          JsefErr::new(NotEof('='),              1)),
-		("[1 2 3",                JsefErr::new(Mismatch(']', None),      6)),
-		("1 2 3]",                JsefErr::new(NotEof('2'),              2)),
-		("{a=1 \"b=2 c=3}",       JsefErr::new(Mismatch('"', None),     14)),
-		("{a=1 b\"=2 c=3}",       JsefErr::new(Mismatch('=', Some('"')), 6)),
-		("{a=1 b= c=3}",          JsefErr::new(Mismatch('}', Some('=')), 9)),
-		("{a=1 =1 c=3}",          JsefErr::new(Mismatch('}', Some('=')), 5)),
-		("{a=1 b c=3}",           JsefErr::new(Mismatch('=', Some('c')), 7)),
-		("[1 b=2 3]",             JsefErr::new(Mismatch(']', Some('=')), 4)),
-		("{a=1 new\nline=2 c=3}", JsefErr::new(Mismatch('=', Some('l')), 9)),
-		("{a=1 b.=2 c=3}",        JsefErr::new(Unexpected(Some('=')),    7)),
-		("{a=1 .b=2 c=3}",        JsefErr::new(Mismatch('}', Some('.')), 5)),
+		("{a=1 b=2 c=3",          JsefErr::new(Mismatch('}', None),      1, 13)),
+		("a=1 b=2 c=3}",          JsefErr::new(NotEof('='),              1,  2)),
+		("[1 2 3",                JsefErr::new(Mismatch(']', None),      1,  7)),
+		("1 2 3]",                JsefErr::new(NotEof('2'),              1,  3)),
+		("{a=1 \"b=2 c=3}",       JsefErr::new(Mismatch('"', None),      1, 15)),
+		("{a=1 b\"=2 c=3}",       JsefErr::new(Mismatch('=', Some('"')), 1,  7)),
+		("{a=1 b= c=3}",          JsefErr::new(Mismatch('}', Some('=')), 1, 10)),
+		("{a=1 =1 c=3}",          JsefErr::new(Mismatch('}', Some('=')), 1,  6)),
+		("{a=1 b c=3}",           JsefErr::new(Mismatch('=', Some('c')), 1,  8)),
+		("[1 b=2 3]",             JsefErr::new(Mismatch(']', Some('=')), 1,  5)),
+		("{a=1 new\nline=2 c=3}", JsefErr::new(Mismatch('=', Some('l')), 2,  1)),
+		("{a=1 b.=2 c=3}",        JsefErr::new(Unexpected(Some('=')),    1,  8)),
+		("{a=1 .b=2 c=3}",        JsefErr::new(Mismatch('}', Some('.')), 1,  6)),
 	];
 	
 	for (string, err) in SOURCES {

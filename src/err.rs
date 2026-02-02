@@ -7,18 +7,19 @@ pub type JsefResult<T = ()> = Result<T, JsefErr>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsefErr {
 	pub err: JsefErrType,
-	pub pos: usize,
+	pub line: usize,
+	pub col: usize,
 }
 
 impl JsefErr {
-	pub const fn new(err: JsefErrType, pos: usize) -> Self {
-		Self {err, pos}
+	pub const fn new(err: JsefErrType, line: usize, col: usize) -> Self {
+		Self {err, line, col}
 	}
 }
 
 impl fmt::Display for JsefErr {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "JSeF error at {}: {}", self.pos, self.err)
+		write!(f, "JSeF error at line {}, col {}: {}", self.line, self.col, self.err)
 	}
 }
 

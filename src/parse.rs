@@ -10,15 +10,16 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct Parser<'s> {
 	source: &'s str,
-	idx: usize,
 	peek: Option<char>,
+	line: usize,
+	col: usize,
 	depth: usize,
 }
 
 impl<'s> Parser<'s> {
 	pub(crate) fn new(source: &'s str) -> Self {
 		let peek = source.chars().next();
-		Self {idx: 0, depth: 0, source, peek}
+		Self {depth: 0, line: 1, col: 1, source, peek}
 	}
 	
 	pub(crate) fn parse_value_root(mut self) -> JsefResult<JsefValue> {
@@ -49,7 +50,7 @@ impl<'s> Parser<'s> {
 
 impl Parser<'_> {
 	fn err(&self, err: JsefErrType) -> JsefErr {
-		JsefErr::new(err, self.idx)
+		JsefErr::new(err, self.line, self.col)
 	}
 	
 	fn peek(&self) -> Option<char> {
@@ -57,14 +58,22 @@ impl Parser<'_> {
 		self.peek
 	}
 	
-	fn advance(&mut self) {
-		self.idx = self.source.ceil_char_boundary(self.idx + 1);
-		self.peek = self.source[self.idx..].chars().next();
+	fn line_col(&mut self, c: char) {
+		if c == '\n' {
+			self.line += 1;
+			self.col = 1;
+		} else {
+			self.col += 1;
+		}
 	}
 	
-	fn move_to(&mut self, idx: usize) {
-		self.idx = idx;
-		self.peek = self.source[self.idx..].chars().next();
+	fn advance(&mut self) {
+		let Some(p) = self.peek() else {return};
+		let idx = p.len_utf8();
+		
+		self.source = &self.source[idx..];
+		self.peek = self.source.chars().next();
+		self.line_col(p);
 	}
 	
 	fn push_depth(&mut self) -> JsefResult {
@@ -94,16 +103,21 @@ impl Parser<'_> {
 	
 	fn take_while<F>(&mut self, mut pred: F) -> &str
 	where F: FnMut(char) -> bool {
-		let start = self.idx;
-		let end = self.source[start..]
-			.char_indices()
-			.find(|(_, c)| !pred(*c))
-			.map(|(i, _)| i + start)
-			.unwrap_or(self.source.len());
+		let mut end = self.source.len();
+		for (i, c) in self.source.char_indices() {
+			if !pred(c) {
+				end = i;
+				break;
+			}
+			
+			self.line_col(c);
+		}
 		
-		self.move_to(end);
+		let slice = &self.source[..end];
+		self.source = &self.source[end..];
+		self.peek = self.source.chars().next();
 		
-		&self.source[start..end]
+		slice
 	}
 	
 	fn eat(&mut self, c: char) -> JsefResult {
@@ -233,13 +247,13 @@ impl Parser<'_> {
 		Ok(())
 	}
 	
-	fn parse_many<C, F>(
+	fn parse_many<P, F>(
 		&mut self,
 		root: bool, open: char, close: char,
-		mut cond: C, mut func: F,
+		mut pred: P, mut func: F,
 	) -> JsefResult
-	where 
-		C: FnMut(char) -> bool,
+	where
+		P: FnMut(char) -> bool,
 		F: FnMut(&mut Self) -> JsefResult,
 	{
 		if !root {
@@ -249,7 +263,7 @@ impl Parser<'_> {
 		
 		self.skip_whitespace();
 		
-		while self.peek().is_some_and(&mut cond) {
+		while self.peek().is_some_and(&mut pred) {
 			func(self)?;
 			self.skip_whitespace();
 		}

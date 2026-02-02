@@ -110,11 +110,13 @@ pub(crate) struct Composer<'o> {
 	opts: &'o ComposeOpts<'o>,
 	target: String,
 	depth: usize,
+	line: usize,
+	col: usize,
 }
 
 impl<'o> Composer<'o> {
 	pub(crate) fn new(opts: &'o ComposeOpts) -> Self {
-		Self {target: String::new(), depth: 0, opts}
+		Self {target: String::new(), depth: 0, line: 1, col: 1, opts}
 	}
 	
 	pub(crate) fn compose_value_root(mut self, value: &JsefValue) -> JsefResult<String> {
@@ -140,7 +142,7 @@ impl<'o> Composer<'o> {
 
 impl Composer<'_> {
 	fn err(&self, err: JsefErrType) -> JsefErr {
-		JsefErr::new(err, self.target.len())
+		JsefErr::new(err, self.line, self.col)
 	}
 	
 	fn push_depth(&mut self) -> JsefResult {
@@ -157,17 +159,41 @@ impl Composer<'_> {
 		self.depth -= 1;
 	}
 	
+	fn write_char(&mut self, c: char) {
+		if c == '\n' {
+			self.line += 1;
+			self.col = 1;
+		} else {
+			self.col += 1;
+		}
+		
+		self.target.push(c);
+	}
+	
+	fn write(&mut self, slice: &str) {
+		for c in slice.chars() {
+			if c == '\n' {
+				self.line += 1;
+				self.col = 1;
+			} else {
+				self.col += 1;
+			}
+		}
+		
+		self.target.push_str(slice);
+	}
+	
 	fn separator(&mut self, space: bool) {
 		if let Some(indent) = self.opts.indent {
 			let len = indent.len() * self.depth + 1;
 			self.target.reserve(len);
-			self.target.push('\n');
+			self.write_char('\n');
 			
 			for _ in 0..self.depth {
-				self.target.push_str(indent);
+				self.write(indent);
 			}
 		} else if space || !self.opts.dense {
-			self.target.push(' ');
+			self.write_char(' ');
 		}
 	}
 	
@@ -176,9 +202,9 @@ impl Composer<'_> {
 			for line in msg.lines() {
 				let len = line.len() + 3;
 				self.target.reserve(len);
-				self.target.push_str("# ");
-				self.target.push_str(line);
-				self.target.push('\n');
+				self.write("# ");
+				self.write(line);
+				self.write_char('\n');
 			}
 		}
 	}
@@ -188,14 +214,14 @@ impl Composer<'_> {
 		
 		for c in string.chars() {
 			match c {
-				'\n' => self.target.push_str("\\n"),
-				'\t' => self.target.push_str("\\t"),
-				'\r' => self.target.push_str("\\r"),
-				'\0' => self.target.push_str("\\0"),
-				'\\' => self.target.push_str("\\\\"),
-				'"' => self.target.push_str("\\\""),
+				'\n' => self.write("\\n"),
+				'\t' => self.write("\\t"),
+				'\r' => self.write("\\r"),
+				'\0' => self.write("\\0"),
+				'\\' => self.write("\\\\"),
+				'"' => self.write("\\\""),
 				
-				c => self.target.push(c),
+				c => self.write_char(c),
 			}
 		}
 	}
@@ -207,9 +233,9 @@ impl Composer<'_> {
 		if quotes {
 			let len = string.len() + 2;
 			self.target.reserve(len);
-			self.target.push('"');
+			self.write_char('"');
 			self.escape_string(string);
-			self.target.push('"');
+			self.write_char('"');
 		} else {
 			self.escape_string(string);
 		}
@@ -224,16 +250,16 @@ impl Composer<'_> {
 				
 				// dict.len() == 1 here, so unwrap should be ok
 				let (key, val) = dict.iter().next().unwrap();
-				self.target.push('.');
-				self.target.push_str(key);
+				self.write_char('.');
+				self.write(key);
 				value = val;
 			}
 		}
 		
 		if self.opts.dense {
-			self.target.push('=');
+			self.write_char('=');
 		} else {
-			self.target.push_str(" = ");
+			self.write(" = ");
 		}
 		
 		self.compose_value(value)?;
@@ -254,7 +280,7 @@ impl Composer<'_> {
 		
 		if !root {
 			self.push_depth()?;
-			self.target.push(open);
+			self.write_char(open);
 		}
 		
 		if let Some(it) = iter.next() {
@@ -271,7 +297,7 @@ impl Composer<'_> {
 		if !root {
 			self.pop_depth();
 			if !empty {self.separator(false);}
-			self.target.push(close);
+			self.write_char(close);
 		}
 		
 		Ok(())
