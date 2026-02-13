@@ -21,9 +21,9 @@ const OPTS: [ComposeOpts; 4] = [
 #[test]
 fn errors() {
 	use JsefErrType::*;
-	const SOURCES: [(&str, JsefErr); 13] = [
-		("{a=1 b=2 c=3",          JsefErr::new(Mismatch('}', None),      1, 13)),
-		("a=1 b=2 c=3}",          JsefErr::new(NotEof('='),              1,  2)),
+	
+	#[cfg(not(feature = "no-line-col"))]
+	const SOURCES: [(&str, JsefErr); 11] = [
 		("[1 2 3",                JsefErr::new(Mismatch(']', None),      1,  7)),
 		("1 2 3]",                JsefErr::new(NotEof('2'),              1,  3)),
 		("{a=1 \"b=2 c=3}",       JsefErr::new(Mismatch('"', None),      1, 15)),
@@ -35,6 +35,21 @@ fn errors() {
 		("{a=1 new\nline=2 c=3}", JsefErr::new(Mismatch('=', Some('l')), 2,  1)),
 		("{a=1 b.=2 c=3}",        JsefErr::new(Unexpected(Some('=')),    1,  8)),
 		("{a=1 .b=2 c=3}",        JsefErr::new(Mismatch('}', Some('.')), 1,  6)),
+	];
+	
+	#[cfg(feature = "no-line-col")]
+	const SOURCES: [(&str, JsefErr); 11] = [
+		("[1 2 3",                JsefErr::new(Mismatch(']', None))),
+		("1 2 3]",                JsefErr::new(NotEof('2'))),
+		("{a=1 \"b=2 c=3}",       JsefErr::new(Mismatch('"', None))),
+		("{a=1 b\"=2 c=3}",       JsefErr::new(Mismatch('=', Some('"')))),
+		("{a=1 b= c=3}",          JsefErr::new(Mismatch('}', Some('=')))),
+		("{a=1 =1 c=3}",          JsefErr::new(Mismatch('}', Some('=')))),
+		("{a=1 b c=3}",           JsefErr::new(Mismatch('=', Some('c')))),
+		("[1 b=2 3]",             JsefErr::new(Mismatch(']', Some('=')))),
+		("{a=1 new\nline=2 c=3}", JsefErr::new(Mismatch('=', Some('l')))),
+		("{a=1 b.=2 c=3}",        JsefErr::new(Unexpected(Some('=')))),
+		("{a=1 .b=2 c=3}",        JsefErr::new(Mismatch('}', Some('.')))),
 	];
 	
 	for (string, err) in SOURCES {
