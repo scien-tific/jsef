@@ -41,6 +41,12 @@ impl fmt::Display for JsefErr {
 
 impl error::Error for JsefErr {}
 
+impl From<JsefErr> for io::Error {
+	fn from(err: JsefErr) -> Self {
+		Self::other(err)
+	}
+}
+
 
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]

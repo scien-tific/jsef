@@ -6,8 +6,6 @@ use crate::{
 };
 
 
-// Basic string slice based recursive descent parser
-// Eventually should maybe be replaced with something based on io::(Buf)Read
 #[derive(Debug)]
 pub(crate) struct Parser<'s> {
 	source: &'s str,
@@ -71,7 +69,7 @@ impl Parser<'_> {
 	fn push_depth(&mut self) -> JsefResult {
 		self.depth += 1;
 		
-		if self.depth < DEPTH_LIMIT {
+		if self.depth <= DEPTH_LIMIT {
 			Ok(())
 		} else {
 			Err(self.counter.err(JsefErrType::MaxDepth))

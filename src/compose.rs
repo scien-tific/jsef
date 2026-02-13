@@ -77,30 +77,38 @@ impl ComposeOpts<'static> {
 }
 
 impl<'a> ComposeOpts<'a> {
-	pub fn indent<T>(mut self, value: T) -> Self
-	where T: Into<Option<&'a str>> {
-		self.indent = value.into();
+	pub const fn indent(mut self, value: &'a str) -> Self {
+		self.indent = Some(value);
 		self
 	}
 	
-	pub fn force_quotes(mut self, value: bool) -> Self {
+	pub const fn no_indent(mut self) -> Self {
+		self.indent = None;
+		self
+	}
+	
+	pub const fn force_quotes(mut self, value: bool) -> Self {
 		self.force_quotes = value;
 		self
 	}
 	
-	pub fn dense(mut self, value: bool) -> Self {
+	pub const fn dense(mut self, value: bool) -> Self {
 		self.dense = value;
 		self
 	}
 	
-	pub fn fold_dicts(mut self, value: bool) -> Self {
+	pub const fn fold_dicts(mut self, value: bool) -> Self {
 		self.fold_dicts = value;
 		self
 	}
 	
-	pub fn prelude<T>(mut self, value: T) -> Self
-	where T: Into<Option<&'a str>> {
-		self.prelude = value.into();
+	pub const fn prelude(mut self, value: &'a str) -> Self {
+		self.prelude = Some(value);
+		self
+	}
+	
+	pub const fn no_prelude(mut self) -> Self {
+		self.prelude = None;
 		self
 	}
 }
@@ -149,7 +157,7 @@ impl Composer<'_> {
 	fn push_depth(&mut self) -> JsefResult {
 		self.depth += 1;
 		
-		if self.depth < DEPTH_LIMIT {
+		if self.depth <= DEPTH_LIMIT {
 			Ok(())
 		} else {
 			Err(self.counter.err(JsefErrType::MaxDepth))

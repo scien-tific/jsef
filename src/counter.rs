@@ -1,7 +1,7 @@
 use crate::{JsefErr, JsefErrType};
 
 
-/// This is just a zero-sized type when the `track-line-col` feature is disabled.
+/// This is just a zero-sized type when the `no-line-col` feature is enabled.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct LineColCounter {
 	#[cfg(not(feature = "no-line-col"))]

@@ -19,7 +19,11 @@ use compose::Composer;
 
 
 /// Maximum nesting level for parsing and composing.
+#[cfg(not(test))]
 pub const DEPTH_LIMIT: usize = 256;
+
+#[cfg(test)]
+pub const DEPTH_LIMIT: usize = 2;
 
 
 /// A list of [`JsefValue`]s.
