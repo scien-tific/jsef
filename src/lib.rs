@@ -16,6 +16,7 @@ pub use compose::ComposeOpts;
 use crash::CrashMap;
 use parse::Parser;
 use compose::Composer;
+use std::io::{Read, Write};
 
 
 /// Maximum nesting level for parsing and composing.
@@ -38,7 +39,8 @@ pub type JsefDict = CrashMap<String, JsefValue>;
 /// Requires root lists and dicts to be enclosed in the appropriate brackets.
 pub fn parse_value<S>(string: &S) -> JsefResult<JsefValue>
 where S: AsRef<str> + ?Sized {
-	Parser::new(string.as_ref()).parse_value_root()
+	let bytes = string.as_ref().as_bytes();
+	Parser::new(bytes)?.parse_value_root()
 }
 
 /// Parses a [`JsefList`] from the input string.
@@ -46,7 +48,8 @@ where S: AsRef<str> + ?Sized {
 /// *Requires* the square brackets around the root list to be omitted.
 pub fn parse_list<S>(string: &S) -> JsefResult<JsefList>
 where S: AsRef<str> + ?Sized {
-	Parser::new(string.as_ref()).parse_list_root()
+	let bytes = string.as_ref().as_bytes();
+	Parser::new(bytes)?.parse_list_root()
 }
 
 /// Parses a [`JsefDict`] from the input string.
@@ -54,7 +57,33 @@ where S: AsRef<str> + ?Sized {
 /// *Requires* the curly brackets around the root dict to be omitted.
 pub fn parse_dict<S>(string: &S) -> JsefResult<JsefDict>
 where S: AsRef<str> + ?Sized {
-	Parser::new(string.as_ref()).parse_dict_root()
+	let bytes = string.as_ref().as_bytes();
+	Parser::new(bytes)?.parse_dict_root()
+}
+
+
+/// Parses a [`JsefValue`] from the `std::io` reader.
+/// 
+/// See also: [`parse_value`]
+pub fn read_value<R>(reader: R) -> JsefResult<JsefValue>
+where R: Read {
+	Parser::new(reader)?.parse_value_root()
+}
+
+/// Parses a [`JsefList`] from the `std::io` reader.
+/// 
+/// See also: [`parse_list`]
+pub fn read_list<R>(reader: R) -> JsefResult<JsefList>
+where R: Read {
+	Parser::new(reader)?.parse_list_root()
+}
+
+/// Parses a [`JsefDict`] from the `std::io` reader.
+/// 
+/// See also: [`parse_dict`]
+pub fn read_dict<R>(reader: R) -> JsefResult<JsefDict>
+where R: Read {
+	Parser::new(reader)?.parse_dict_root()
 }
 
 
@@ -62,21 +91,52 @@ where S: AsRef<str> + ?Sized {
 /// 
 /// Includes root brackets and acts as a counterpart to [`parse_value`].
 pub fn compose_value(value: &JsefValue, opts: &ComposeOpts) -> JsefResult<String> {
-	Composer::new(opts).compose_value_root(value)
+	let mut buf = Vec::new();
+	Composer::new(&mut buf, opts).compose_value_root(value)?;
+	Ok(unsafe {String::from_utf8_unchecked(buf)})
 }
 
 /// Composes the input [`JsefList`] into a string formatted using [`opts`](ComposeOpts).
 /// 
 /// Omits root square brackets and acts as a counterpart to [`parse_list`].
 pub fn compose_list(list: &JsefList, opts: &ComposeOpts) -> JsefResult<String> {
-	Composer::new(opts).compose_list_root(list)
+	let mut buf = Vec::new();
+	Composer::new(&mut buf, opts).compose_list_root(list)?;
+	Ok(unsafe {String::from_utf8_unchecked(buf)})
 }
 
 /// Composes the input [`JsefDict`] into a string formatted using [`opts`](ComposeOpts).
 /// 
 /// Omits root curly brackets and acts as a counterpart to [`parse_dict`].
 pub fn compose_dict(dict: &JsefDict, opts: &ComposeOpts) -> JsefResult<String> {
-	Composer::new(opts).compose_dict_root(dict)
+	let mut buf = Vec::new();
+	Composer::new(&mut buf, opts).compose_dict_root(dict)?;
+	Ok(unsafe {String::from_utf8_unchecked(buf)})
+}
+
+
+/// Composes the input [`JsefValue`] into the `std::io` writer.
+/// 
+/// See also: [`compose_value`]
+pub fn write_value<W>(value: &JsefValue, opts: &ComposeOpts, writer: W) -> JsefResult
+where W: Write {
+	Composer::new(writer, opts).compose_value_root(value)
+}
+
+/// Composes the input [`JsefList`] into the `std::io` writer.
+/// 
+/// See also: [`compose_list`]
+pub fn write_list<W>(list: &JsefList, opts: &ComposeOpts, writer: W) -> JsefResult
+where W: Write {
+	Composer::new(writer, opts).compose_list_root(list)
+}
+
+/// Composes the input [`JsefDict`] into the `std::io` writer.
+/// 
+/// See also: [`compose_dict`]
+pub fn write_dict<W>(dict: &JsefDict, opts: &ComposeOpts, writer: W) -> JsefResult
+where W: Write {
+	Composer::new(writer, opts).compose_dict_root(dict)
 }
 
 

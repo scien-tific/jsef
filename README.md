@@ -7,8 +7,6 @@ A basic, JSON-like format with super fancy features such as:
 - Line comments
 - Only string values, parse them yourself!
 
-[`JsefErr`] tracks line and column numbers by default. It can be disabled with the `no-line-col` feature.
-
 ## Example
 
 ```text
@@ -34,6 +32,6 @@ dict.a.oops = z # dict.a is now replaced with {oops = z}
 
 - [x] `ComposeOpts::fold_dicts`
 - [x] `ComposeOpts::prelude`
-- [ ] `io::Read` and `io::Write` based parsing and composing
+- [x] `io::Read` and `io::Write` based parsing and composing
 - [ ] Better tests
 - [ ] Detailed specs?

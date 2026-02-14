@@ -1,4 +1,5 @@
-use std::io::{self, Read, Bytes};
+use crate::JsefErrType::{self, InvalidUtf8};
+use std::io::{Read, Bytes};
 
 
 // https://en.wikipedia.org/wiki/UTF-8
@@ -11,26 +12,9 @@ impl<R: Read> CharReader<R> {
 	pub(crate) fn new(reader: R) -> Self {
 		Self {bytes: reader.bytes()}
 	}
-}
-
-impl<R: Read> CharReader<R> {
-	fn read_cont(&mut self) -> io::Result<u32> {
-		use io::ErrorKind::InvalidData;
-		
-		let byte = self.bytes.next()
-			.ok_or_else(|| io::Error::from(InvalidData))??;
-		
-		match byte {
-			0x80..=0xBF => Ok(u32::from(byte & 0x3F)),
-			_ => Err(InvalidData.into()),
-		}
-	}
 	
-	fn read_code(&mut self) -> io::Result<Option<char>> {
-		use io::ErrorKind::InvalidData;
-		
+	pub(crate) fn read_char(&mut self) -> Result<Option<char>, JsefErrType> {
 		let byte = self.bytes.next().transpose()?;
-		
 		let code = match byte {
 			Some(b @ 0x00..=0x7F) => return Ok(Some(char::from(b))),
 			
@@ -50,20 +34,22 @@ impl<R: Read> CharReader<R> {
 				self.read_cont()?,
 			
 			None => return Ok(None),
-			_ => return Err(InvalidData.into()),
+			_ => return Err(InvalidUtf8),
 		};
 		
 		char::from_u32(code)
-			.ok_or_else(|| io::Error::from(InvalidData))
+			.ok_or_else(|| InvalidUtf8)
 			.map(|c| Some(c))
 	}
 }
 
-impl<R: Read> Iterator for CharReader<R> {
-	type Item = io::Result<char>;
-	
-	fn next(&mut self) -> Option<Self::Item> {
-		// Implementation works with a transposed return type for easier error propagation
-		self.read_code().transpose()
+impl<R: Read> CharReader<R> {
+	fn read_cont(&mut self) -> Result<u32, JsefErrType> {
+		let byte = self.bytes.next().transpose()?;
+		
+		match byte {
+			Some(b @ 0x80..=0xBF) => Ok(u32::from(b & 0x3F)),
+			_ => Err(InvalidUtf8),
+		}
 	}
 }

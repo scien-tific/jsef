@@ -18,30 +18,20 @@ const OPTS: [ComposeOpts; 4] = [
 fn errors() {
 	use JsefErrType::*;
 	
-	#[cfg(not(feature = "no-line-col"))]
-	const SOURCES: [(&str, JsefErr); 6] = [
-		("0 1 2]",                JsefErr::new(NotEof('1'),              1, 3)),
-		("[0 1 2}",               JsefErr::new(Mismatch(']', Some('}')), 1, 7)),
-		("\"value",               JsefErr::new(Mismatch('"', None),      1, 7)),
-		("{a=0 b.=1 c=2}",        JsefErr::new(Unexpected(Some('=')),    1, 8)),
-		("{a=0 .b=1 c=2}",        JsefErr::new(Mismatch('}', Some('.')), 1, 6)),
-		("[0 [1 [2]]]",           JsefErr::new(MaxDepth,                 1, 7)),
-	];
-	
-	#[cfg(feature = "no-line-col")]
-	const SOURCES: [(&str, JsefErr); 6] = [
-		("0 1 2]",                JsefErr::new(NotEof('1'))),
-		("[0 1 2}",               JsefErr::new(Mismatch(']', Some('}')))),
-		("\"value",               JsefErr::new(Mismatch('"', None))),
-		("{a=0 b.=1 c=2}",        JsefErr::new(Unexpected(Some('=')))),
-		("{a=0 .b=1 c=2}",        JsefErr::new(Mismatch('}', Some('.')))),
-		("[0 [1 [2]]]",           JsefErr::new(MaxDepth)),
-	];
-	
-	for (string, err) in SOURCES {
-		let result = parse_value(string).unwrap_err();
-		assert_eq!(result, err);
+	// JsefErr no longer implements Eq, so this mess needs to exist
+	macro_rules! test_err {
+		($src:literal => $err:pat) => {
+			let result = parse_value($src).unwrap_err();
+			assert!(matches!(result, $err));
+		};
 	}
+	
+	test_err!("0 1 2]"         => JsefErr {err: NotEof('1'),              line: 1, col: 3});
+	test_err!("[0 1 2}"        => JsefErr {err: Mismatch(']', Some('}')), line: 1, col: 7});
+	test_err!("\"value"        => JsefErr {err: Mismatch('"', None),      line: 1, col: 7});
+	test_err!("{a=0 b.=1 c=2}" => JsefErr {err: Unexpected(Some('=')),    line: 1, col: 8});
+	test_err!("{a=0 .b=1 c=2}" => JsefErr {err: Mismatch('}', Some('.')), line: 1, col: 6});
+	test_err!("[0 [1 [2]]]"    => JsefErr {err: MaxDepth,                 line: 1, col: 7});
 }
 
 
@@ -101,7 +91,6 @@ fn compose() {
 	];
 	
 	let mut root = JsefList::new();
-	let mut zero = JsefList::new();
 	let mut dict = JsefDict::default();
 	let mut path = JsefDict::default();
 	
