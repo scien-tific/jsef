@@ -4,12 +4,12 @@ version = 4
 
 [[package]]
 name = "crash"
-version = "0.2.0"
-source = "git+https://github.com/scien-tific/crash.git?tag=v0.2.0#4576a7b5db5b58957a6a7da3b4ce01865c88d9d2"
+version = "0.2.1"
+source = "git+https://github.com/scien-tific/crash.git?tag=v0.2.1#94373247ccedb01b919772448448b0e6bc5c82a3"
 
 [[package]]
 name = "jsef"
-version = "0.3.0"
+version = "0.2.3"
 dependencies = [
  "crash",
 ]

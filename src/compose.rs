@@ -1,10 +1,10 @@
 use crate::{
 	JsefValue, JsefList, JsefDict,
-	JsefErrType, JsefResult,
-	DEPTH_LIMIT, is_word_char,
-	counter::LineColCounter,
+	JsefErrType::{self, *},
+	JsefErr, JsefResult,
+	DEPTH_LIMIT,
+	is_word_char, count_line_col,
 };
-use std::io::Write;
 
 
 /// Formatting options for composing [`JsefValue`]s into strings.
@@ -116,94 +116,67 @@ impl<'a> ComposeOpts<'a> {
 
 
 #[derive(Debug)]
-pub(crate) struct Composer<'o, W> where W: Write {
+pub(crate) struct Composer<'o> {
 	opts: &'o ComposeOpts<'o>,
-	target: W,
+	target: String,
 	depth: usize,
-	counter: LineColCounter,
 }
 
-impl<'o, W: Write> Composer<'o, W> {
-	pub(crate) fn new(target: W, opts: &'o ComposeOpts) -> Self {
-		Self {
-			depth: 0,
-			counter: LineColCounter::new(),
-			target, opts,
-		}
+impl<'o> Composer<'o> {
+	pub(crate) fn new(opts: &'o ComposeOpts) -> Self {
+		Self {target: String::new(), depth: 0, opts}
 	}
 	
-	pub(crate) fn compose_value_root(mut self, value: &JsefValue) -> JsefResult {
-		self.compose_prelude()?;
+	pub(crate) fn compose_value_root(mut self, value: &JsefValue) -> JsefResult<String> {
+		self.compose_prelude();
 		self.compose_value(value)?;
-		Ok(())
+		Ok(self.target)
 	}
 	
-	pub(crate) fn compose_list_root(mut self, list: &JsefList) -> JsefResult {
-		self.compose_prelude()?;
+	pub(crate) fn compose_list_root(mut self, list: &JsefList) -> JsefResult<String> {
+		self.compose_prelude();
 		self.compose_list(list, true)?;
-		Ok(())
+		Ok(self.target)
 	}
 	
-	pub(crate) fn compose_dict_root(mut self, dict: &JsefDict) -> JsefResult {
-		self.compose_prelude()?;
+	pub(crate) fn compose_dict_root(mut self, dict: &JsefDict) -> JsefResult<String> {
+		self.compose_prelude();
 		self.compose_dict(dict, true)?;
-		Ok(())
+		Ok(self.target)
 	}
 }
 
-impl<W: Write> Composer<'_, W> {
-	fn push_depth(&mut self) -> JsefResult {
-		self.depth += 1;
-		
-		if self.depth <= DEPTH_LIMIT {
-			Ok(())
-		} else {
-			Err(self.counter.err(JsefErrType::MaxDepth))
-		}
+impl Composer<'_> {
+	fn err(&self, err: JsefErrType) -> JsefErr {
+		let (line, col) = count_line_col(&self.target);
+		JsefErr::new(err, line, col)
 	}
 	
-	fn pop_depth(&mut self) {
-		self.depth -= 1;
-	}
-	
-	fn write(&mut self, string: &str) -> JsefResult {
-		for c in string.chars() {
-			self.counter.count(c);
-		}
-		
-		self.target.write(string.as_bytes())
-			.map_err(|err| self.counter.err(err.into()))?;
-		
-		Ok(())
-	}
-	
-	fn separator(&mut self, space: bool) -> JsefResult {
+	fn separator(&mut self, space: bool) {
 		if let Some(indent) = self.opts.indent {
-			self.write("\n")?;
+			let len = indent.len() * self.depth + 1;
+			self.target.reserve(len);
+			self.target.push_str("\n");
 			
 			for _ in 0..self.depth {
-				self.write(indent)?;
+				self.target.push_str(indent);
 			}
 		} else if space || !self.opts.dense {
-			self.write(" ")?;
+			self.target.push_str(" ");
 		}
-		
-		Ok(())
 	}
 	
-	fn compose_prelude(&mut self) -> JsefResult {
+	fn compose_prelude(&mut self) {
 		if let Some(msg) = self.opts.prelude {
 			for line in msg.lines() {
-				self.write("# ")?;
-				self.write(line)?;
-				self.write("\n")?;
+				self.target.push_str("# ");
+				self.target.push_str(line);
+				self.target.push_str("\n");
 			}
 		}
-		
-		Ok(())
 	}
 	
-	fn escape_string(&mut self, string: &str) -> JsefResult {
+	fn escape_string(&mut self, string: &str) {
 		let mut idx = 0;
 		for (i, c) in string.char_indices() {
 			let esc = match c {
@@ -218,38 +191,32 @@ impl<W: Write> Composer<'_, W> {
 			};
 			
 			let slice = &string[idx..i];
-			self.write(slice)?;
-			self.write(esc)?;
+			self.target.push_str(slice);
+			self.target.push_str(esc);
 			
 			// CHANGE THIS if escaped chars can be more than one byte long
 			idx = i + 1;
 		}
 		
 		let slice = &string[idx..];
-		if !slice.is_empty() {
-			self.write(slice)?;
-		}
-		
-		Ok(())
+		self.target.push_str(slice);
 	}
 	
-	fn compose_string(&mut self, string: &str) -> JsefResult {
+	fn compose_string(&mut self, string: &str) {
 		let quotes = self.opts.force_quotes ||
 			string.chars().any(|c| !is_word_char(c));
 		
 		if quotes {
-			self.write("\"")?;
-			self.escape_string(string)?;
-			self.write("\"")?;
+			self.target.push_str("\"");
+			self.escape_string(string);
+			self.target.push_str("\"");
 		} else {
-			self.escape_string(string)?;
+			self.escape_string(string);
 		}
-		
-		Ok(())
 	}
 	
 	fn compose_pair(&mut self, key: &str, mut value: &JsefValue) -> JsefResult {
-		self.compose_string(key)?;
+		self.compose_string(key);
 		
 		if self.opts.fold_dicts {
 			while let Some(dict) = value.as_dict() {
@@ -257,16 +224,16 @@ impl<W: Write> Composer<'_, W> {
 				
 				// dict.len() == 1 here, so unwrap should be ok
 				let (key, val) = dict.iter().next().unwrap();
-				self.write(".")?;
-				self.write(key)?;
+				self.target.push_str(".");
+				self.target.push_str(key);
 				value = val;
 			}
 		}
 		
 		if self.opts.dense {
-			self.write("=")?;
+			self.target.push_str("=");
 		} else {
-			self.write(" = ")?;
+			self.target.push_str(" = ");
 		}
 		
 		self.compose_value(value)?;
@@ -276,7 +243,7 @@ impl<W: Write> Composer<'_, W> {
 	fn compose_many<I, F>(
 		&mut self,
 		root: bool,
-		open: &str, close: &str,
+		open: char, close: char,
 		mut iter: I, mut func: F
 	) -> JsefResult
 	where
@@ -286,25 +253,29 @@ impl<W: Write> Composer<'_, W> {
 		let mut empty = true;
 		
 		if !root {
-			self.push_depth()?;
-			self.write(open)?;
+			self.depth += 1;
+			if self.depth > DEPTH_LIMIT {
+				return Err(self.err(MaxDepth));
+			}
+			
+			self.target.push(open);
 		}
 		
 		if let Some(it) = iter.next() {
 			empty = false;
-			if !root {self.separator(false)?;}
+			if !root {self.separator(false);}
 			func(self, it)?;
 		}
 		
 		for it in iter {
-			self.separator(true)?;
+			self.separator(true);
 			func(self, it)?;
 		}
 		
 		if !root {
-			self.pop_depth();
-			if !empty {self.separator(false)?;}
-			self.write(close)?;
+			self.depth -= 1;
+			if !empty {self.separator(false);}
+			self.target.push(close);
 		}
 		
 		Ok(())
@@ -312,20 +283,20 @@ impl<W: Write> Composer<'_, W> {
 	
 	fn compose_value(&mut self, value: &JsefValue) -> JsefResult {
 		match value {
-			JsefValue::String(string) => self.compose_string(string),
+			JsefValue::String(string) => Ok(self.compose_string(string)),
 			JsefValue::List(list) => self.compose_list(list, false),
 			JsefValue::Dict(dict) => self.compose_dict(dict, false),
 		}
 	}
 	
 	fn compose_list(&mut self, list: &JsefList, root: bool) -> JsefResult {
-		self.compose_many(root, "[", "]", list.iter(),
+		self.compose_many(root, '[', ']', list.iter(),
 			|this, val| this.compose_value(val)
 		)
 	}
 	
 	fn compose_dict(&mut self, dict: &JsefDict, root: bool) -> JsefResult {
-		self.compose_many(root, "{", "}", dict.iter(),
+		self.compose_many(root, '{', '}', dict.iter(),
 			|this, (key, val)| this.compose_pair(key, val)
 		)
 	}

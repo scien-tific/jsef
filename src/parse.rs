@@ -1,38 +1,34 @@
 use crate::{
 	JsefValue, JsefList, JsefDict,
-	JsefErrType, JsefResult,
-	DEPTH_LIMIT, is_word_char,
-	counter::LineColCounter,
-	io::CharReader,
+	JsefErrType::{self, *},
+	JsefErr, JsefResult,
+	DEPTH_LIMIT,
+	is_word_char, count_line_col,
 };
-use std::io::Read;
 
 
 #[derive(Debug)]
-pub(crate) struct Parser<R> where R: Read {
-	source: CharReader<R>,
+pub(crate) struct Parser<'s> {
+	source: &'s str,
 	peek: Option<char>,
-	counter: LineColCounter,
+	idx: usize,
 	depth: usize,
 }
 
-impl<R: Read> Parser<R> {
-	pub(crate) fn new(source: R) -> JsefResult<Self> {
-		let mut parser = Self {
-			source: CharReader::new(source),
-			peek: None,
-			depth: 0,
-			counter: LineColCounter::new(),
-		};
+impl<'s> Parser<'s> {
+	pub(crate) fn new(source: &'s str) -> Self {
+		let peek = source.chars().next();
 		
-		parser.advance()?;
-		Ok(parser)
+		Self {
+			idx: 0, depth: 0,
+			source, peek,
+		}
 	}
 	
 	pub(crate) fn parse_value_root(mut self) -> JsefResult<JsefValue> {
-		self.skip_whitespace()?;
+		self.skip_whitespace();
 		let value = self.parse_value()?;
-		self.skip_whitespace()?;
+		self.skip_whitespace();
 		self.assert_eof()?;
 		
 		Ok(value)
@@ -40,7 +36,7 @@ impl<R: Read> Parser<R> {
 	
 	pub(crate) fn parse_list_root(mut self) -> JsefResult<JsefList> {
 		let list = self.parse_list(true)?;
-		self.skip_whitespace()?;
+		self.skip_whitespace();
 		self.assert_eof()?;
 		
 		Ok(list)
@@ -48,140 +44,112 @@ impl<R: Read> Parser<R> {
 	
 	pub(crate) fn parse_dict_root(mut self) -> JsefResult<JsefDict> {
 		let dict = self.parse_dict(true)?;
-		self.skip_whitespace()?;
+		self.skip_whitespace();
 		self.assert_eof()?;
 		
 		Ok(dict)
 	}
 }
 
-impl<R: Read> Parser<R> {
+impl Parser<'_> {
+	fn err(&self, err: JsefErrType) -> JsefErr {
+		let (line, col) = count_line_col(&self.source[..self.idx]);
+		JsefErr::new(err, line, col)
+	}
+	
+	fn slice(&self) -> &str {
+		&self.source[self.idx..]
+	}
+	
 	fn peek(&self) -> Option<char> {
-		// uhh
 		self.peek
 	}
 	
-	fn advance(&mut self) -> JsefResult {
-		if let Some(p) = self.peek() {
-			self.counter.count(p);
-		}
+	fn next(&mut self) -> Option<char> {
+		let prev = self.peek;
+		self.idx = self.source.ceil_char_boundary(self.idx + 1);
+		self.peek = self.slice().chars().next();
 		
-		self.peek = self.source.read_char()
-			.map_err(|err| self.counter.err(err))?;
-		
-		Ok(())
-	}
-	
-	fn push_depth(&mut self) -> JsefResult {
-		self.depth += 1;
-		
-		if self.depth <= DEPTH_LIMIT {
-			Ok(())
-		} else {
-			Err(self.counter.err(JsefErrType::MaxDepth))
-		}
-	}
-	
-	fn pop_depth(&mut self) {
-		self.depth -= 1;
+		prev
 	}
 	
 	fn take(&mut self) -> JsefResult<char> {
-		match self.peek() {
-			Some(c) => {
-				self.advance()?;
-				Ok(c)
-			},
-			
-			p => Err(self.counter.err(
-				JsefErrType::Unexpected(p)
-			)),
-		}
+		self.next().ok_or_else(|| self.err(Unexpected(None)))
 	}
 	
-	fn skip_while<F>(&mut self, mut pred: F) -> JsefResult
+	fn next_while<F>(&mut self, mut pred: F) -> &str
 	where F: FnMut(char) -> bool {
-		while let Some(c) = self.peek() {
-			if !pred(c) {break;}
-			self.advance()?;
+		let slice = self.slice();
+		let len = slice.len();
+		let start = self.idx;
+		
+		let find = slice
+			.char_indices()
+			.find(|(_, c)| !pred(*c));
+		
+		if let Some((i, c)) = find {
+			self.peek = Some(c);
+			self.idx += i;
+		} else {
+			self.peek = None;
+			self.idx += len;
 		}
 		
-		Ok(())
-	}
-	
-	fn take_while<F>(&mut self, mut pred: F, string: &mut String) -> JsefResult
-	where F: FnMut(char) -> bool {
-		while let Some(c) = self.peek() {
-			if !pred(c) {break;}
-			string.push(c);
-			self.advance()?;
-		}
-		
-		Ok(())
+		&self.source[start..self.idx]
 	}
 	
 	fn eat(&mut self, c: char) -> JsefResult {
-		let peek = self.peek();
-		
-		if peek == Some(c) {
-			self.advance()?;
-			Ok(())
-		} else {
-			Err(self.counter.err(
-				JsefErrType::Mismatch(c, peek)
-			))
+		// Can't call Self::next right away,
+		// since that would screw up the error line-column reporting
+		match self.peek() {
+			Some(p) if p == c => {
+				self.next();
+				Ok(())
+			},
+			
+			p => Err(self.err(Mismatch(c, p))),
 		}
 	}
 	
-	fn try_eat(&mut self, c: char) -> JsefResult<bool> {
+	fn try_eat(&mut self, c: char) -> bool {
 		if self.peek() == Some(c) {
-			self.advance()?;
-			Ok(true)
+			self.next();
+			true
 		} else {
-			Ok(false)
+			false
 		}
 	}
 	
 	fn assert_eof(&self) -> JsefResult {
-		if let Some(c) = self.peek() {
-			Err(self.counter.err(
-				JsefErrType::NotEof(c)
-			))
-		} else {
-			Ok(())
+		match self.peek() {
+			Some(p) => Err(self.err(NotEof(p))),
+			None => Ok(()),
 		}
 	}
 	
-	fn skip_whitespace(&mut self) -> JsefResult {
+	fn skip_whitespace(&mut self) {
 		while let Some(c) = self.peek() {
 			if c.is_ascii_whitespace() {
-				self.advance()?;
-				self.skip_while(|c| c.is_ascii_whitespace())?;
+				self.next_while(|c| c.is_ascii_whitespace());
 				continue;
 			}
 			
 			if c == '#' {
-				self.advance()?;
-				self.skip_while(|c| c != '\n')?;
+				self.next_while(|c| c != '\n');
 				continue;
 			}
 			
 			break;
 		}
-		
-		Ok(())
 	}
 	
 	fn parse_word(&mut self) -> JsefResult<String> {
-		let mut string = String::new();
-		self.take_while(is_word_char, &mut string)?;
+		let slice = self.next_while(is_word_char);
 		
-		if !string.is_empty() {
-			Ok(string)
+		if !slice.is_empty() {
+			Ok(slice.to_owned())
 		} else {
-			Err(self.counter.err(
-				JsefErrType::Unexpected(self.peek())
-			))
+			Err(self.err(Unexpected(self.peek())))
 		}
 	}
 	
@@ -203,10 +171,8 @@ impl<R: Read> Parser<R> {
 		self.eat('"')?;
 		
 		loop {
-			self.take_while(
-				|c| c != '"' && c != '\\',
-				&mut string,
-			)?;
+			let slice = self.next_while(|c| c != '"' && c != '\\');
+			string.push_str(slice);
 			
 			if self.peek() == Some('\\') {
 				let c = self.parse_escape()?;
@@ -221,18 +187,17 @@ impl<R: Read> Parser<R> {
 	}
 	
 	fn parse_ident(&mut self) -> JsefResult<String> {
-		if self.peek() == Some('"') {
-			self.parse_string()
-		} else {
-			self.parse_word()
+		match self.peek() {
+			Some('"') => self.parse_string(),
+			_ => self.parse_word(),
 		}
 	}
 	
 	fn parse_pair(&mut self, mut dict: &mut JsefDict) -> JsefResult {
 		let mut key = self.parse_ident()?;
-		self.skip_whitespace()?;
+		self.skip_whitespace();
 		
-		while self.try_eat('.')? {
+		while self.try_eat('.') {
 			let value = dict
 				.entry(key)
 				.or_insert_with(JsefValue::new_dict);
@@ -247,13 +212,13 @@ impl<R: Read> Parser<R> {
 				},
 			}
 			
-			self.skip_whitespace()?;
+			self.skip_whitespace();
 			key = self.parse_ident()?;
-			self.skip_whitespace()?;
+			self.skip_whitespace();
 		}
 		
 		self.eat('=')?;
-		self.skip_whitespace()?;
+		self.skip_whitespace();
 		
 		let value = self.parse_value()?;
 		dict.insert(key, value);
@@ -271,19 +236,23 @@ impl<R: Read> Parser<R> {
 		F: FnMut(&mut Self) -> JsefResult,
 	{
 		if !root {
-			self.push_depth()?;
+			self.depth += 1;
+			if self.depth > DEPTH_LIMIT {
+				return Err(self.err(MaxDepth));
+			}
+			
 			self.eat(open)?;
 		}
 		
-		self.skip_whitespace()?;
+		self.skip_whitespace();
 		
 		while self.peek().is_some_and(&mut pred) {
 			func(self)?;
-			self.skip_whitespace()?;
+			self.skip_whitespace();
 		}
 		
 		if !root {
-			self.pop_depth();
+			self.depth -= 1;
 			self.eat(close)?;
 		}
 		
@@ -297,9 +266,7 @@ impl<R: Read> Parser<R> {
 			Some('"') => Ok(JsefValue::String(self.parse_string()?)),
 			Some(_) => Ok(JsefValue::String(self.parse_word()?)),
 			
-			p => Err(self.counter.err(
-				JsefErrType::Unexpected(p)
-			)),
+			p => Err(self.err(Unexpected(p))),
 		}
 	}
 	

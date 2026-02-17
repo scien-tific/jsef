@@ -27,11 +27,3 @@ dict.a = x
 dict.b = y
 dict.a.oops = z # dict.a is now replaced with {oops = z}
 ```
-
-## TODO
-
-- [x] `ComposeOpts::fold_dicts`
-- [x] `ComposeOpts::prelude`
-- [x] `io::Read` and `io::Write` based parsing and composing
-- [ ] Better tests
-- [ ] Detailed specs?

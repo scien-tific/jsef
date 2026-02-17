@@ -1,10 +1,10 @@
-use std::{fmt, io, error};
+use std::{fmt, error};
 
 
 pub type JsefResult<T = ()> = Result<T, JsefErr>;
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsefErr {
 	pub err: JsefErrType,
 	pub line: usize,
@@ -27,14 +27,12 @@ impl error::Error for JsefErr {}
 
 
 #[non_exhaustive]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JsefErrType {
 	Unexpected(Option<char>),
 	Mismatch(char, Option<char>),
 	NotEof(char),
 	MaxDepth,
-	InvalidUtf8,
-	IoErr(io::Error),
 }
 
 impl fmt::Display for JsefErrType {
@@ -46,16 +44,8 @@ impl fmt::Display for JsefErrType {
 			Self::Mismatch(e, Some(g)) => write!(f, "expected '{e}', got '{g}'"),
 			Self::NotEof(c)            => write!(f, "expected EOF, got '{c}'"),
 			Self::MaxDepth             => write!(f, "maximum nesting depth exceeded"),
-			Self::InvalidUtf8          => write!(f, "invalid UTF-8"),
-			Self::IoErr(err)           => write!(f, "IO error: {err}"),
 		}
 	}
 }
 
 impl error::Error for JsefErrType {}
-
-impl From<io::Error> for JsefErrType {
-	fn from(err: io::Error) -> Self {
-		Self::IoErr(err)
-	}
-}
